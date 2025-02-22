@@ -99,18 +99,28 @@ class VulnerabilitySync:
                 return True
         return False
 
-    def sync_vulnerabilities(self):
-        """Main sync function"""
-        # Get vulnerabilities from GitHub
-        vulnerabilities = self.get_github_vulnerabilities()
+    def is_duplicate(self, vulnerability, existing_issues):
+    """Check if vulnerability already exists in Jira"""
+    # Print out the vulnerability to understand its structure
+    print(f"Checking vulnerability: {vulnerability}")
+
+    # Ensure that we are dealing with a dictionary
+    if isinstance(vulnerability, dict):
+        vuln_number = vulnerability.get('number', None)
         
-        # Get existing Jira issues
-        existing_issues = self.get_existing_jira_issues()
+        # Check if we have a valid vulnerability number
+        if not vuln_number:
+            print("No vulnerability number found!")
+            return False
         
-        # Process each vulnerability
-        for vuln in vulnerabilities:
-            if not self.is_duplicate(vuln, existing_issues):
-                self.create_jira_subtask(vuln)
+        for issue in existing_issues:
+            if issue['fields'].get('customfield_10015') == vuln_number:
+                return True
+    else:
+        print(f"Expected a dictionary, but got: {type(vulnerability)}")
+    
+    return False
+
 
 if __name__ == "__main__":
     syncer = VulnerabilitySync()
