@@ -6,7 +6,7 @@ from datetime import datetime
 
 class VulnerabilitySync:
     def __init__(self):
-        self.github_token = os.environ['GITHUB_TOKEN']
+        self.github_token = os.environ['GH_TOKEN']
         self.jira_base_url = os.environ['JIRA_BASE_URL']
         self.jira_api_token = os.environ['JIRA_API_TOKEN']
         self.jira_email = os.environ['JIRA_EMAIL']
