@@ -12,10 +12,6 @@ class VulnerabilitySync:
         self.jira_email = os.environ['JIRA_EMAIL']
         self.jira_epic_key = os.environ['JIRA_EPIC_KEY']
         
-        # Ensure JIRA_BASE_URL starts with 'http://' or 'https://'
-        if not self.jira_base_url.startswith(('http://', 'https://')):
-            raise ValueError(f"Invalid JIRA_BASE_URL: {self.jira_base_url}. It must start with 'http://' or 'https://'.")
-        
         # Setup auth headers
         self.github_headers = {
             'Authorization': f'token {self.github_token}',
@@ -43,7 +39,17 @@ class VulnerabilitySync:
             headers=self.jira_headers,
             params={'jql': jql, 'fields': 'summary,description,customfield_10015'}
         )
-        return response.json()['issues']
+        
+        # Debugging: Log the response content and status
+        print(f"Jira API Response Status Code: {response.status_code}")
+        print(f"Jira API Response Body: {response.text}")
+        
+        # Check if response contains 'issues' key
+        if response.status_code == 200:
+            return response.json().get('issues', [])
+        else:
+            # Handle failure (e.g., authentication failure, incorrect JQL, etc.)
+            raise ValueError(f"Failed to fetch Jira issues: {response.status_code} - {response.text}")
 
     def create_jira_subtask(self, vulnerability):
         """Create a Jira subtask for a vulnerability"""
