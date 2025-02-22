@@ -12,9 +12,6 @@ class VulnerabilitySync:
         self.jira_email = os.environ['JIRA_EMAIL']
         self.jira_epic_key = os.environ['JIRA_EPIC_KEY']
         
-        # Debugging: Print the Epic Key to verify it's being fetched correctly
-        print(f"Current JIRA_EPIC_KEY: {self.jira_epic_key}")
-        
         # Setup auth headers
         self.github_headers = {
             'Authorization': f'token {self.github_token}',
@@ -35,28 +32,21 @@ class VulnerabilitySync:
 
     def get_existing_jira_issues(self):
         """Get existing Jira issues under the epic"""
-        # Check if jira_epic_key is valid
-        if not self.jira_epic_key:
-            raise ValueError("JIRA_EPIC_KEY is not set or is empty. Please ensure the Epic Key is provided.")
-
-        jql = f'project = KAN AND "Epic Link" = "{self.jira_epic_key}"'
+        jql = f'project = KAN AND "Epic Link" = {self.jira_epic_key}'
         url = f'{self.jira_base_url}/rest/api/3/search'
-        
         response = requests.get(
             url,
             headers=self.jira_headers,
             params={'jql': jql, 'fields': 'summary,description,customfield_10015'}
         )
-        
-        # Debugging: Log the response content and status
+        # Debugging the Jira response
         print(f"Jira API Response Status Code: {response.status_code}")
         print(f"Jira API Response Body: {response.text}")
         
-        # Check if response contains 'issues' key
+        # If the response is successful, return issues
         if response.status_code == 200:
             return response.json().get('issues', [])
         else:
-            # Handle failure (e.g., authentication failure, incorrect JQL, etc.)
             raise ValueError(f"Failed to fetch Jira issues: {response.status_code} - {response.text}")
 
     def create_jira_subtask(self, vulnerability):
@@ -93,34 +83,38 @@ class VulnerabilitySync:
 
     def is_duplicate(self, vulnerability, existing_issues):
         """Check if vulnerability already exists in Jira"""
-        vuln_number = vulnerability['number']
-        for issue in existing_issues:
-            if issue['fields'].get('customfield_10015') == vuln_number:
-                return True
+        # Print out the vulnerability to understand its structure
+        print(f"Checking vulnerability: {vulnerability}")
+
+        # Ensure that we are dealing with a dictionary
+        if isinstance(vulnerability, dict):
+            vuln_number = vulnerability.get('number', None)
+            
+            # Check if we have a valid vulnerability number
+            if not vuln_number:
+                print("No vulnerability number found!")
+                return False
+            
+            for issue in existing_issues:
+                if issue['fields'].get('customfield_10015') == vuln_number:
+                    return True
+        else:
+            print(f"Expected a dictionary, but got: {type(vulnerability)}")
+        
         return False
 
-    def is_duplicate(self, vulnerability, existing_issues):
-    """Check if vulnerability already exists in Jira"""
-    # Print out the vulnerability to understand its structure
-    print(f"Checking vulnerability: {vulnerability}")
-
-    # Ensure that we are dealing with a dictionary
-    if isinstance(vulnerability, dict):
-        vuln_number = vulnerability.get('number', None)
+    def sync_vulnerabilities(self):
+        """Main sync function"""
+        # Get vulnerabilities from GitHub
+        vulnerabilities = self.get_github_vulnerabilities()
         
-        # Check if we have a valid vulnerability number
-        if not vuln_number:
-            print("No vulnerability number found!")
-            return False
+        # Get existing Jira issues
+        existing_issues = self.get_existing_jira_issues()
         
-        for issue in existing_issues:
-            if issue['fields'].get('customfield_10015') == vuln_number:
-                return True
-    else:
-        print(f"Expected a dictionary, but got: {type(vulnerability)}")
-    
-    return False
-
+        # Process each vulnerability
+        for vuln in vulnerabilities:
+            if not self.is_duplicate(vuln, existing_issues):
+                self.create_jira_subtask(vuln)
 
 if __name__ == "__main__":
     syncer = VulnerabilitySync()
