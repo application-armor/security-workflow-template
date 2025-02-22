@@ -6,7 +6,7 @@ from datetime import datetime
 
 class VulnerabilitySync:
     def __init__(self):
-        self.github_token = os.environ['GH_TOKEN']
+        self.github_token = os.environ['GH_TOKEN']  # Updated to GH_TOKEN
         self.jira_base_url = os.environ['JIRA_BASE_URL']
         self.jira_api_token = os.environ['JIRA_API_TOKEN']
         self.jira_email = os.environ['JIRA_EMAIL']
@@ -28,6 +28,12 @@ class VulnerabilitySync:
         repo = os.environ['GITHUB_REPOSITORY']
         url = f'https://api.github.com/repos/{repo}/code-scanning/alerts'
         response = requests.get(url, headers=self.github_headers)
+        
+        # Handle errors if the response is not successful
+        if response.status_code != 200:
+            print(f"Error fetching GitHub vulnerabilities: {response.status_code} - {response.text}")
+            return []
+        
         return response.json()
 
     def get_existing_jira_issues(self):
@@ -39,15 +45,12 @@ class VulnerabilitySync:
             headers=self.jira_headers,
             params={'jql': jql, 'fields': 'summary,description,customfield_10015'}
         )
-        # Debugging the Jira response
-        print(f"Jira API Response Status Code: {response.status_code}")
-        print(f"Jira API Response Body: {response.text}")
         
-        # If the response is successful, return issues
-        if response.status_code == 200:
-            return response.json().get('issues', [])
-        else:
-            raise ValueError(f"Failed to fetch Jira issues: {response.status_code} - {response.text}")
+        if response.status_code != 200:
+            print(f"Error fetching Jira issues: {response.status_code} - {response.text}")
+            return []
+        
+        return response.json().get('issues', [])
 
     def create_jira_subtask(self, vulnerability):
         """Create a Jira subtask for a vulnerability"""
@@ -79,26 +82,17 @@ class VulnerabilitySync:
         }
 
         response = requests.post(url, headers=self.jira_headers, json=payload)
+        if response.status_code != 201:
+            print(f"Error creating Jira subtask: {response.status_code} - {response.text}")
+            return None
         return response.json()
 
     def is_duplicate(self, vulnerability, existing_issues):
         """Check if vulnerability already exists in Jira"""
-        # Debugging the structure of the vulnerability
-        print(f"Checking vulnerability: {vulnerability}")
-        
-        if isinstance(vulnerability, dict):
-            vuln_number = vulnerability.get('number', None)
-            
-            if not vuln_number:
-                print("No vulnerability number found!")
-                return False
-            
-            for issue in existing_issues:
-                if issue['fields'].get('customfield_10015') == vuln_number:
-                    return True
-        else:
-            print(f"Expected a dictionary, but got: {type(vulnerability)}")
-
+        vuln_number = vulnerability['number']
+        for issue in existing_issues:
+            if issue['fields'].get('customfield_10015') == vuln_number:
+                return True
         return False
 
     def sync_vulnerabilities(self):
@@ -106,19 +100,16 @@ class VulnerabilitySync:
         # Get vulnerabilities from GitHub
         vulnerabilities = self.get_github_vulnerabilities()
         
-        # Debugging vulnerabilities response
-        print(f"Fetched vulnerabilities: {json.dumps(vulnerabilities, indent=2)}")
-        
         # Get existing Jira issues
         existing_issues = self.get_existing_jira_issues()
         
         # Process each vulnerability
         for vuln in vulnerabilities:
-            if isinstance(vuln, dict):  # Ensure the vulnerability is a dictionary
+            if isinstance(vuln, dict):  # Ensure we have a valid dictionary before proceeding
                 if not self.is_duplicate(vuln, existing_issues):
                     self.create_jira_subtask(vuln)
             else:
-                print(f"Skipping invalid vulnerability (not a dictionary): {vuln}")
+                print(f"Skipping invalid vulnerability: {vuln}")
 
 if __name__ == "__main__":
     syncer = VulnerabilitySync()
