@@ -12,6 +12,9 @@ class VulnerabilitySync:
         self.jira_email = os.environ['JIRA_EMAIL']
         self.jira_epic_key = os.environ['JIRA_EPIC_KEY']
         
+        # Debugging: Print the Epic Key to verify it's being fetched correctly
+        print(f"Current JIRA_EPIC_KEY: {self.jira_epic_key}")
+        
         # Setup auth headers
         self.github_headers = {
             'Authorization': f'token {self.github_token}',
@@ -32,8 +35,13 @@ class VulnerabilitySync:
 
     def get_existing_jira_issues(self):
         """Get existing Jira issues under the epic"""
-        jql = f'project = KAN AND "Epic Link" = {self.jira_epic_key}'
+        # Check if jira_epic_key is valid
+        if not self.jira_epic_key:
+            raise ValueError("JIRA_EPIC_KEY is not set or is empty. Please ensure the Epic Key is provided.")
+
+        jql = f'project = KAN AND "Epic Link" = "{self.jira_epic_key}"'
         url = f'{self.jira_base_url}/rest/api/3/search'
+        
         response = requests.get(
             url,
             headers=self.jira_headers,
