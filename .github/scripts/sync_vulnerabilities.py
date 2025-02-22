@@ -12,6 +12,13 @@ class VulnerabilitySync:
         self.jira_email = os.environ['JIRA_EMAIL']
         self.jira_epic_key = os.environ['JIRA_EPIC_KEY']
         
+        # Debugging: Print JIRA_BASE_URL to check its value
+        print(f"JIRA Base URL: {self.jira_base_url}")
+
+        # Ensure the base URL has the correct scheme
+        if not self.jira_base_url.startswith(('http://', 'https://')):
+            raise ValueError(f"Invalid JIRA_BASE_URL: {self.jira_base_url}. It must start with 'http://' or 'https://'.")
+
         # Setup auth headers
         self.github_headers = {
             'Authorization': f'token {self.github_token}',
@@ -26,6 +33,7 @@ class VulnerabilitySync:
     def get_github_vulnerabilities(self):
         """Fetch vulnerabilities from GitHub Code Scanning API"""
         repo = os.environ['GITHUB_REPOSITORY']
+        print(f"GitHub Repository: {repo}")  # Debugging
         url = f'https://api.github.com/repos/{repo}/code-scanning/alerts'
         response = requests.get(url, headers=self.github_headers)
         return response.json()
